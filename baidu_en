@@ -1,0 +1,94 @@
+#!/usr/bin/python 
+# -*- coding: UTF-8 -*-  
+import sys
+import json
+from urllib import urlopen
+#from html import HTMLParser
+from HTMLParser import HTMLParser
+#import HTMLParser
+#print HTMLParser.__file__
+import hashlib
+import time
+
+def get_result(word):
+	#url = 'http://fanyi.youdao.com/openapi.do?keyfrom=majunzhe&key=27448872&type=data&doctype=json&version=1.1&q='
+    appid = '20170105000035331'
+    key = 'eQtpI_RJYtyZS0sm2AZf'
+    slat = bytes(int(time.time()))
+    sign_str = appid+word+slat+key
+    sign_md5 = hashlib.md5()
+    sign_md5.update(sign_str)
+    sign =  sign_md5.hexdigest()
+    url = 'http://api.fanyi.baidu.com/api/trans/vip/translate?q='+word
+    params = '&from=auto&to=en&appid='+appid+'&salt='+slat+'&sign='+sign
+    query_url = url + params
+    #print("---------")
+    #print(query_url)
+    result = urlopen(query_url).read().decode('utf-8')
+    return result
+
+class WordResultParser(HTMLParser):
+	bHandled = False
+	bExplain = False
+	data_meaning = ''
+	output = ''
+	tags = ('phonetic', 'ex', 'key')
+	def parse_data(self, data):
+		beg_pos = data.rfind('[') + 1
+		end_pos = data.find(']', beg_pos, len(data))
+		if end_pos == -1:
+			end_pos = len(data)
+		#print(beg_pos)
+		#print(end_pos)
+		#print(data)
+		self.data_meaning = data[beg_pos:end_pos]
+
+	def handle_starttag(self, tag, attrs):
+		if 'basic' == tag:
+			self.output += '基本释义：\n'
+		elif 'web' == tag:
+			self.output += '网络释义：\n'
+		elif 'explain' == tag:
+			self.bExplain = True
+		if tag in self.tags:
+			self.bHandled = True
+
+	def handle_endtag(self, tag):
+		if 'explain' == tag:
+			self.output += '\n'
+			self.bExplain = False
+
+	def unknown_decl(self, data):
+		if self.bHandled != True:
+			return
+		self.parse_data(data)
+		endstr = '\n'
+		if self.bExplain:
+			endstr = ' '
+		self.output += self.data_meaning + endstr
+		self.bHandled = False
+
+def print_results():
+	for word in sys.argv[1:]:
+		# get the query result
+		word_result = get_result(word)
+        #print(word_result)
+    #{"from":"en","to":"zh","trans_result":[{"src":"hello .jon","dst":"\u4f60\u597d\uff0c\u4e54\u6069"}]}
+        json_result = json.loads(word_result)
+        trans_r = json_result["trans_result"];
+        #print(trans_r)
+        result = trans_r[0]
+        #print(result)
+        dst = result["dst"]
+        print(dst)
+        #query=json_result["query"]
+        #translation=json_result["translation"]
+        #for trans in translation:
+        #    print trans
+        #if json_result.has_key("basic"):
+        #    explains=json_result["basic"]["explains"]
+        #    if explains:
+        #        for ex in explains:
+        #            print ex
+        
+print_results()
